@@ -368,9 +368,11 @@ function drawChart(el,ents,u){
   const s=[...ents].sort((a,b)=>new Date(a.date)-new Date(b.date));
   const dw=s.map(e=>toDisplay(e.weight,u));
   const mn=Math.min(...dw)-(u==='lbs'?2:1), mx=Math.max(...dw)+(u==='lbs'?2:1);
-  const W=700,H=160,pL=44,pR=20,pT=16,pB=24,iW=W-pL-pR,iH=H-pT-pB;
+  const W=700,H=180,pL=44,pR=20,pT=16,pB=24,iW=W-pL-pR,iH=H-pT-pB-20;
   const px=i=>pL+(i/(s.length-1))*iW, py=w=>pT+iH-((w-mn)/(mx-mn))*iH;
   const pts=s.map((e,i)=>`${px(i)},${py(dw[i])}`).join(' ');
+  // Extract just the emoji from feeling string (first char which is the emoji)
+  const emoji=e=>e.feeling?[...e.feeling][0]:'';
   el.setAttribute('viewBox',`0 0 ${W} ${H}`); el.setAttribute('height',H);
   el.innerHTML=`<defs><linearGradient id="wg" x1="0" y1="0" x2="0" y2="1">
     <stop offset="0%" stop-color="#3fb950" stop-opacity=".25"/><stop offset="100%" stop-color="#3fb950" stop-opacity="0"/>
@@ -380,7 +382,17 @@ function drawChart(el,ents,u){
     <text x="${pL-6}" y="${y+4}" text-anchor="end" fill="#8b949e" font-size="10" font-family="DM Mono,monospace">${v}</text>`;}).join('')}
   <polygon points="${pL},${pT+iH} ${pts} ${px(s.length-1)},${pT+iH}" fill="url(#wg)"/>
   <polyline points="${pts}" fill="none" stroke="#3fb950" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
-  ${s.map((e,i)=>`<circle cx="${px(i)}" cy="${py(dw[i])}" r="5" fill="#1c2330" stroke="#3fb950" stroke-width="2.5"/>`).join('')}
+  ${s.map((e,i)=>{
+    const em=emoji(e);
+    const cx=px(i), cy=py(dw[i]);
+    if(em){
+      // Emoji label — no dot, just the emoji centered on the point
+      return `<circle cx="${cx}" cy="${cy}" r="11" fill="#1c2330" stroke="#30363d" stroke-width="1.5"/>
+              <text x="${cx}" y="${cy+5}" text-anchor="middle" font-size="13">${em}</text>`;
+    } else {
+      return `<circle cx="${cx}" cy="${cy}" r="5" fill="#1c2330" stroke="#3fb950" stroke-width="2.5"/>`;
+    }
+  }).join('')}
   ${s.map((e,i)=>(i===0||i===s.length-1||s.length<=6)?
     `<text x="${px(i)}" y="${H-4}" text-anchor="middle" fill="#8b949e" font-size="9" font-family="DM Mono,monospace">${fmtShort(e.date)}</text>`:''
   ).join('')}`;
@@ -414,7 +426,19 @@ function shareChart(){
   ctx.fillStyle=g;ctx.fill();
   ctx.beginPath();dw.forEach((w,i)=>i===0?ctx.moveTo(px(i),py(w)):ctx.lineTo(px(i),py(w)));
   ctx.strokeStyle='#3fb950';ctx.lineWidth=2.5;ctx.lineJoin='round';ctx.lineCap='round';ctx.stroke();
-  dw.forEach((w,i)=>{ctx.beginPath();ctx.arc(px(i),py(w),5,0,Math.PI*2);ctx.fillStyle='#1c2330';ctx.fill();ctx.strokeStyle='#3fb950';ctx.lineWidth=2.5;ctx.stroke();});
+  dw.forEach((w,i)=>{
+    const em=s[i].feeling?[...s[i].feeling][0]:'';
+    const cx=px(i),cy=py(w);
+    if(em){
+      ctx.beginPath();ctx.arc(cx,cy,11,0,Math.PI*2);ctx.fillStyle='#1c2330';ctx.fill();
+      ctx.strokeStyle='#30363d';ctx.lineWidth=1.5;ctx.stroke();
+      ctx.font='13px serif';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText(em,cx,cy);ctx.textBaseline='alphabetic';
+    } else {
+      ctx.beginPath();ctx.arc(cx,cy,5,0,Math.PI*2);ctx.fillStyle='#1c2330';ctx.fill();
+      ctx.strokeStyle='#3fb950';ctx.lineWidth=2.5;ctx.stroke();
+    }
+  });
   ctx.fillStyle='#8b949e';ctx.font='10px monospace';ctx.textAlign='center';
   s.forEach((e,i)=>{if(i===0||i===s.length-1||s.length<=6)ctx.fillText(fmtShort(e.date),px(i),CH-14);});
   ctx.textAlign='right';ctx.fillStyle='#30363d';ctx.font='11px monospace';ctx.fillText('Wegovy Tracker',CW-20,CH-14);
