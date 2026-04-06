@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<meta name="theme-color" content="#0d1117"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Wegovy Tracker"/>
+<title>Wegovy Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:#0d1117;color:#e6edf3;font-family:'Syne',sans-serif;min-height:100vh;-webkit-tap-highlight-color:transparent}
+.app{max-width:860px;margin:0 auto;padding:32px 16px 80px}
+.header{margin-bottom:32px}
+.header-top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.header-pill{display:inline-flex;align-items:center;gap:8px;background:#1a3a22;border:1px solid rgba(63,185,80,.27);border-radius:100px;padding:4px 14px;font-family:'DM Mono',monospace;font-size:11px;color:#3fb950;letter-spacing:.08em;text-transform:uppercase;margin-bottom:14px}
+.dot{width:6px;height:6px;border-radius:50%;background:#3fb950;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+h1{font-size:clamp(28px,5vw,44px);font-weight:800;letter-spacing:-.02em;color:#e6edf3;line-height:1.1}
+h1 span{color:#3fb950}
+.subtitle{color:#8b949e;font-size:15px;margin-top:8px;font-weight:400}
+.header-right{display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0}
+.unit-toggle{display:flex;background:#161b22;border:1px solid #30363d;border-radius:8px;overflow:hidden}
+.unit-btn{background:none;border:none;color:#8b949e;font-family:'DM Mono',monospace;font-size:12px;font-weight:500;padding:7px 16px;cursor:pointer;transition:all .15s;letter-spacing:.05em}
+.unit-btn.active{background:#3fb950;color:#0d1117;font-weight:700}
+.unit-btn:first-child{border-right:1px solid #30363d}
+
+/* Google Drive sync bar */
+.sync-bar{display:flex;align-items:center;gap:10px;background:#1c2330;border:1px solid #30363d;border-radius:10px;padding:10px 16px;margin-bottom:20px;flex-wrap:wrap}
+.sync-status{display:flex;align-items:center;gap:7px;font-family:'DM Mono',monospace;font-size:11px;color:#8b949e;flex:1}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:#30363d;flex-shrink:0}
+.sync-dot.connected{background:#3fb950}
+.sync-dot.syncing{background:#e3b341;animation:pulse 1s infinite}
+.sync-dot.error{background:#f85149}
+.btn-gdrive{display:inline-flex;align-items:center;gap:7px;background:#161b22;border:1px solid #30363d;color:#c9d1d9;border-radius:7px;padding:7px 14px;font-family:'Syne',sans-serif;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;white-space:nowrap}
+.btn-gdrive:hover{border-color:#8b949e;color:#e6edf3}
+.btn-gdrive.connected{border-color:rgba(63,185,80,.4);color:#3fb950;background:#1a3a22}
+
+.start-date-row{display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap}
+.start-date-label{font-family:'DM Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#8b949e}
+.start-date-input{background:#161b22;border:1px solid #30363d;border-radius:7px;color:#e6edf3;font-family:'Syne',sans-serif;font-size:13px;padding:6px 10px;outline:none;transition:border-color .2s}
+.start-date-input:focus{border-color:rgba(63,185,80,.53)}
+.btn-small{background:#1a3a22;border:1px solid rgba(63,185,80,.4);color:#3fb950;border-radius:7px;padding:6px 14px;font-family:'Syne',sans-serif;font-size:12px;font-weight:700;cursor:pointer;transition:opacity .15s}
+.btn-small:hover{opacity:.8}
+.btn-link{background:none;border:none;color:#8b949e;font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;text-decoration:underline;padding:0}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:32px}
+.stat-card{background:#1c2330;border:1px solid #30363d;border-radius:14px;padding:20px;position:relative;overflow:hidden}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.stat-card.green::before{background:#3fb950}
+.stat-card.teal::before{background:#39d0d8}
+.stat-card.gold::before{background:#e3b341}
+.stat-label{font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:#8b949e;margin-bottom:8px}
+.stat-value{font-size:28px;font-weight:800;letter-spacing:-.02em}
+.stat-card.green .stat-value{color:#3fb950}
+.stat-card.teal .stat-value{color:#39d0d8}
+.stat-card.gold .stat-value{color:#e3b341}
+.stat-sub{font-size:12px;color:#8b949e;margin-top:4px}
+.chart-wrap{background:#1c2330;border:1px solid #30363d;border-radius:14px;padding:24px;margin-bottom:24px}
+.chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:8px}
+.chart-title{font-size:13px;font-weight:600;color:#8b949e;text-transform:uppercase;letter-spacing:.08em;font-family:'DM Mono',monospace}
+.chart-empty{color:#8b949e;font-size:13px;text-align:center;padding:32px 0}
+.btn-share{display:inline-flex;align-items:center;gap:7px;background:#075e54;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-family:'Syne',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:opacity .15s,transform .1s}
+.btn-share:hover{opacity:.88;transform:translateY(-1px)}
+svg.chart{width:100%;overflow:visible}
+.section-title{font-size:18px;font-weight:700;color:#c9d1d9;margin-bottom:16px;display:flex;align-items:center;gap:10px}
+.section-title::after{content:'';flex:1;height:1px;background:#30363d}
+.form-card{background:#1c2330;border:1px solid #30363d;border-radius:14px;padding:24px;margin-bottom:24px;transition:border-color .3s,box-shadow .3s}
+.form-card.flash{border-color:#3fb950;box-shadow:0 0 0 3px rgba(63,185,80,.2)}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+@media(max-width:540px){.form-grid{grid-template-columns:1fr}}
+.field label{display:block;font-family:'DM Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#8b949e;margin-bottom:8px}
+.field input,.field textarea{width:100%;background:#161b22;border:1px solid #30363d;border-radius:8px;color:#e6edf3;font-family:'Syne',sans-serif;font-size:14px;padding:10px 12px;outline:none;transition:border-color .2s}
+.field input:focus,.field textarea:focus{border-color:rgba(63,185,80,.53)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{background:#161b22;border:1px solid #30363d;border-radius:100px;padding:6px 14px;font-size:13px;cursor:pointer;transition:all .15s;color:#c9d1d9;user-select:none}
+.chip.active{background:#1a3a22;border-color:#3fb950;color:#3fb950}
+.chip.teal-active{background:#0d2f33;border-color:#39d0d8;color:#39d0d8}
+.btn-primary{background:#3fb950;color:#0d1117;border:none;border-radius:8px;padding:12px 28px;font-family:'Syne',sans-serif;font-size:15px;font-weight:700;cursor:pointer;transition:opacity .15s,transform .1s;width:100%;margin-top:4px}
+.btn-primary:hover{opacity:.9;transform:translateY(-1px)}
+.btn-primary:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.log-entry{background:#1c2330;border:1px solid #30363d;border-radius:12px;padding:18px 20px;margin-bottom:10px;display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:start;transition:border-color .15s}
+.log-entry:hover{border-color:rgba(63,185,80,.27)}
+.log-date{font-family:'DM Mono',monospace;font-size:11px;color:#8b949e;white-space:nowrap;padding-top:2px}
+.log-weight{font-size:22px;font-weight:800;color:#3fb950;letter-spacing:-.02em;line-height:1}
+.log-unit{font-size:13px;font-weight:400;color:#8b949e}
+.log-meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.badge{font-size:11px;padding:3px 10px;border-radius:100px;font-family:'DM Mono',monospace}
+.badge-dose{background:#0d2f33;color:#39d0d8;border:1px solid rgba(57,208,216,.2)}
+.badge-activity{background:#2a1f3d;color:#b794f4;border:1px solid rgba(183,148,244,.2)}
+.badge-feel{background:#1a2433;color:#c9d1d9;border:1px solid #30363d}
+.log-notes{font-size:13px;color:#8b949e;margin-top:6px;font-style:italic}
+.delete-btn{background:none;border:none;color:#30363d;cursor:pointer;font-size:16px;padding:2px 6px;border-radius:6px;transition:color .15s,background .15s;line-height:1}
+.delete-btn:hover{color:#f85149;background:rgba(248,81,73,.094)}
+.empty-state{text-align:center;padding:48px 24px;color:#8b949e;font-size:15px}
+.empty-icon{font-size:40px;margin-bottom:12px}
+.trend-up{color:#f85149}
+.trend-down{color:#3fb950}
+.tabs{display:flex;gap:4px;background:#161b22;border:1px solid #30363d;border-radius:10px;padding:4px;margin-bottom:24px;width:fit-content}
+.tab{background:none;border:1px solid transparent;color:#8b949e;font-family:'Syne',sans-serif;font-size:13px;font-weight:600;padding:8px 18px;border-radius:7px;cursor:pointer;transition:all .15s}
+.tab.active{background:#1c2330;color:#e6edf3;border-color:#30363d}
+.toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:#3fb950;color:#0d1117;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;padding:12px 24px;border-radius:100px;box-shadow:0 4px 24px rgba(0,0,0,.44);z-index:999;white-space:nowrap;opacity:0;transition:opacity .3s,transform .3s;pointer-events:none;max-width:90vw;text-align:center}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(-4px)}
+.toast.error{background:#f85149;color:#fff}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;pointer-events:none;transition:opacity .2s}
+.modal-overlay.show{opacity:1;pointer-events:all}
+.modal{background:#1c2330;border:1px solid #30363d;border-radius:16px;padding:28px;width:100%;max-width:480px;transform:translateY(16px);transition:transform .2s}
+.modal-overlay.show .modal{transform:translateY(0)}
+.modal-title{font-size:17px;font-weight:700;color:#e6edf3;margin-bottom:6px}
+.modal-sub{font-size:13px;color:#8b949e;margin-bottom:16px;line-height:1.6}
+.modal-sub strong{color:#e6edf3}
+.modal-textarea{width:100%;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#e6edf3;font-family:'DM Mono',monospace;font-size:12px;padding:12px;outline:none;resize:vertical;min-height:120px;transition:border-color .2s}
+.modal-textarea:focus{border-color:rgba(63,185,80,.53)}
+.modal-btns{display:flex;gap:10px;margin-top:16px}
+.modal-confirm{flex:1;background:#3fb950;color:#0d1117;border:none;border-radius:8px;padding:11px;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;cursor:pointer}
+.modal-confirm:disabled{opacity:.4;cursor:not-allowed}
+.modal-cancel{background:#161b22;color:#8b949e;border:1px solid #30363d;border-radius:8px;padding:11px 18px;font-family:'Syne',sans-serif;font-size:14px;font-weight:600;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+<div class="toast" id="toast"></div>
+<div class="modal-overlay" id="importModal">
+  <div class="modal">
+    <div class="modal-title">Import backup</div>
+    <div class="modal-sub">On your PC tap <strong>Export backup</strong> — it copies a code to your clipboard.<br/>Paste it below and tap <strong>Import</strong>.</div>
+    <textarea class="modal-textarea" id="importText" placeholder="Paste your backup code here…"></textarea>
+    <div class="modal-btns">
+      <button class="modal-cancel" onclick="closeImport()">Cancel</button>
+      <button class="modal-confirm" id="importConfirmBtn" onclick="doImport()" disabled>Import</button>
+    </div>
+  </div>
+</div>
+
+<!-- Google Identity Services -->
+<script src="https://accounts.google.com/gsi/client" async></script>
+
+<script>
+// ── Config ────────────────────────────────────────────────────────────────────
+const CLIENT_ID   = '917861287305-7r0fgoackpbgh3c8r8vm14ki2pt4bvr1.apps.googleusercontent.com';
+const SCOPES      = 'https://www.googleapis.com/auth/drive.appdata';
+const FILE_NAME   = 'wegovy-tracker-data.json';
+
+// ── Local storage (always used as cache/fallback) ─────────────────────────────
+const LS = { ENTRIES:'wegovy-entries', START:'wegovy-start', UNIT:'wegovy-unit', TOKEN:'wegovy-gtoken' };
+function lsGet(k)    { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }
+function lsSet(k, v) { localStorage.setItem(k, JSON.stringify(v)); }
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let entries     = lsGet(LS.ENTRIES) || [];
+let startDate   = localStorage.getItem(LS.START) || '';
+let unit        = localStorage.getItem(LS.UNIT)  || 'kg';
+let activeTab   = 'log';
+let form        = { date: today(), weight:'', dose:'', feeling:'', activities:[], notes:'' };
+let editingStart = !startDate;
+let tempStart    = startDate;
+
+// Drive state
+let accessToken  = null;
+let driveFileId  = null;
+let syncStatus   = 'disconnected'; // disconnected | syncing | connected | error
+let tokenClient  = null;
+let syncTimeout  = null;
+
+const DOSES      = ['0.25mg','0.5mg','1mg','1.7mg','2.4mg'];
+const FEELINGS   = ['😊 Great','🙂 Good','😐 Okay','😴 Tired','🤢 Nauseous','💪 Strong'];
+const ACTIVITIES = ['🚶 Walking','🏃 Running','🚴 Cycling','🏊 Swimming','🧘 Yoga','🏋️ Weights','💃 Dance','🤸 Other'];
+
+function today() { return new Date().toISOString().slice(0,10); }
+function toDisplay(kg, u) { return u==='lbs' ? +(kg*2.20462).toFixed(1) : +kg.toFixed(1); }
+function toKg(val, u)     { return u==='lbs' ? +(val/2.20462).toFixed(2) : +parseFloat(val).toFixed(2); }
+function fmtDate(d)      { return new Date(d+'T00:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'}); }
+function fmtDateShort(d) { return new Date(d+'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'}); }
+function weekNum() {
+  if (!startDate) return null;
+  return Math.max(1, Math.ceil((new Date()-new Date(startDate+'T00:00:00'))/(7*86400000)));
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+let toastTimer;
+function showToast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast'+(type==='error'?' error':'');
+  requestAnimationFrame(()=>t.classList.add('show'));
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 4000);
+}
+
+// ── Google Drive API ──────────────────────────────────────────────────────────
+function initGoogleAuth() {
+  // Wait for GSI to load
+  const wait = setInterval(()=>{
+    if (!window.google) return;
+    clearInterval(wait);
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: CLIENT_ID,
+      scope: SCOPES,
+      callback: async (resp) => {
+        if (resp.error) { setSyncStatus('error'); showToast('Google sign-in failed: '+resp.error,'error'); return; }
+        accessToken = resp.access_token;
+        lsSet(LS.TOKEN, { token: accessToken, expires: Date.now() + (resp.expires_in||3600)*1000 });
+        setSyncStatus('syncing');
+        render();
+        await loadFromDrive();
+      }
+    });
+    // Try to restore previous session silently
+    const saved = lsGet(LS.TOKEN);
+    if (saved && saved.expires > Date.now()+60000) {
+      accessToken = saved.token;
+      setSyncStatus('syncing');
+      render();
+      loadFromDrive();
+    }
+  }, 200);
+}
+
+function signInWithGoogle() {
+  if (!tokenClient) { showToast('Google auth not ready yet, please wait…','error'); return; }
+  tokenClient.requestAccessToken({ prompt: accessToken ? '' : 'consent' });
+}
+
+function signOut() {
+  if (accessToken) google.accounts.oauth2.revoke(accessToken, ()=>{});
+  accessToken = null; driveFileId = null;
+  localStorage.removeItem(LS.TOKEN);
+  setSyncStatus('disconnected');
+  render();
+  showToast('Signed out of Google Drive.');
+}
+
+function setSyncStatus(s) { syncStatus = s; updateSyncBar(); }
+
+function updateSyncBar() {
+  const dot  = document.getElementById('syncDot');
+  const text = document.getElementById('syncText');
+  const btn  = document.getElementById('syncBtn');
+  if (!dot || !text || !btn) return;
+  const labels = { disconnected:'Not connected', syncing:'Syncing…', connected:'Synced to Google Drive', error:'Sync error' };
+  dot.className  = 'sync-dot'+(syncStatus!=='disconnected'?' '+syncStatus:'');
+  text.textContent = labels[syncStatus] || syncStatus;
+  if (accessToken) {
+    btn.textContent = '✕ Sign out';
+    btn.className   = 'btn-gdrive connected';
+    btn.onclick     = signOut;
+  } else {
+    btn.innerHTML   = `<svg width="14" height="14" viewBox="0 0 24 24"><path fill="#4285f4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34a853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#fbbc05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#ea4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg> Connect Google Drive`;
+    btn.className   = 'btn-gdrive';
+    btn.onclick     = signInWithGoogle;
+  }
+}
+
+async function driveRequest(method, url, body, contentType) {
+  const headers = { 'Authorization': 'Bearer '+accessToken };
+  if (contentType) headers['Content-Type'] = contentType;
+  const resp = await fetch(url, { method, headers, body });
+  if (resp.status === 401) {
+    // Token expired — clear and ask user to reconnect
+    accessToken = null; localStorage.removeItem(LS.TOKEN);
+    setSyncStatus('disconnected'); render();
+    showToast('Google session expired. Please reconnect.','error');
+    throw new Error('auth_expired');
+  }
+  return resp;
+}
+
+async function findDriveFile() {
+  const r = await driveRequest('GET',
+    `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='${FILE_NAME}'&fields=files(id,name)`);
+  const data = await r.json();
+  return data.files && data.files.length ? data.files[0].id : null;
+}
+
+async function loadFromDrive() {
+  try {
+    setSyncStatus('syncing'); updateSyncBar();
+    driveFileId = await findDriveFile();
+    if (!driveFileId) {
+      // No file yet — push local data to Drive
+      await saveToDrive();
+      return;
+    }
+    const r = await driveRequest('GET',
+      `https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`);
+    const data = await r.json();
+    if (data.entries) {
+      entries   = data.entries;
+      lsSet(LS.ENTRIES, entries);
+    }
+    if (data.startDate) { startDate = data.startDate; localStorage.setItem(LS.START, startDate); editingStart = false; tempStart = startDate; }
+    if (data.unit)      { unit = data.unit; localStorage.setItem(LS.UNIT, unit); }
+    setSyncStatus('connected'); render();
+    showToast('✅ Data loaded from Google Drive!');
+  } catch(e) {
+    if (e.message !== 'auth_expired') { setSyncStatus('error'); updateSyncBar(); showToast('Could not load from Drive: '+e.message,'error'); }
+  }
+}
+
+async function saveToDrive() {
+  if (!accessToken) return; // offline — local save only
+  try {
+    setSyncStatus('syncing'); updateSyncBar();
+    const payload = JSON.stringify({ version:1, savedAt:new Date().toISOString(), entries, startDate, unit });
+    if (!driveFileId) driveFileId = await findDriveFile();
+    if (driveFileId) {
+      // Update existing file
+      await driveRequest('PATCH',
+        `https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`,
+        payload, 'application/json');
+    } else {
+      // Create new file in appDataFolder
+      const meta = JSON.stringify({ name: FILE_NAME, parents: ['appDataFolder'] });
+      const boundary = 'wegovy_boundary';
+      const body = `--${boundary}\r\nContent-Type: application/json\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${payload}\r\n--${boundary}--`;
+      const r = await driveRequest('POST',
+        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
+        body, `multipart/related; boundary=${boundary}`);
+      const d = await r.json();
+      driveFileId = d.id;
+    }
+    setSyncStatus('connected'); updateSyncBar();
+  } catch(e) {
+    if (e.message !== 'auth_expired') { setSyncStatus('error'); updateSyncBar(); }
+  }
+}
+
+// Debounced save — waits 1.5s after last change before writing to Drive
+function scheduleDriveSave() {
+  clearTimeout(syncTimeout);
+  syncTimeout = setTimeout(saveToDrive, 1500);
+}
+
+// ── Local save (always) ───────────────────────────────────────────────────────
+function saveAll() {
+  lsSet(LS.ENTRIES, entries);
+  scheduleDriveSave();
+}
+
+// ── Import / Export ───────────────────────────────────────────────────────────
+function openImport()  { document.getElementById('importText').value=''; document.getElementById('importModal').classList.add('show'); }
+function closeImport() { document.getElementById('importModal').classList.remove('show'); }
+
+function doImport() {
+  const raw = document.getElementById('importText').value.trim();
+  try {
+    const data = JSON.parse(raw);
+    if (!data.entries||!Array.isArray(data.entries)) throw new Error('Invalid');
+    entries = data.entries; saveAll();
+    if (data.startDate) { startDate=data.startDate; localStorage.setItem(LS.START,startDate); editingStart=false; tempStart=startDate; }
+    if (data.unit)      { unit=data.unit; localStorage.setItem(LS.UNIT,unit); }
+    closeImport();
+    showToast('✅ Imported '+entries.length+' entries!');
+    render();
+  } catch { showToast('❌ Invalid backup code.','error'); }
+}
+
+document.getElementById('importText').addEventListener('input',function(){ document.getElementById('importConfirmBtn').disabled=!this.value.trim(); });
+document.getElementById('importModal').addEventListener('click',function(e){ if(e.target===this)closeImport(); });
+
+async function doExport() {
+  const payload = JSON.stringify({ version:1, exportedAt:new Date().toISOString(), startDate, unit, entries });
+  try { await navigator.clipboard.writeText(payload); showToast('✅ Backup code copied to clipboard!'); }
+  catch {
+    const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([payload],{type:'application/json'}));
+    a.download='wegovy-backup-'+today()+'.json'; a.click();
+    showToast('✅ Backup file downloaded!');
+  }
+}
+
+// ── Chart ─────────────────────────────────────────────────────────────────────
+function drawChart(svgEl, ents, u) {
+  const sorted=[...ents].sort((a,b)=>new Date(a.date)-new Date(b.date));
+  const dw=sorted.map(e=>toDisplay(e.weight,u));
+  const minW=Math.min(...dw)-(u==='lbs'?2:1), maxW=Math.max(...dw)+(u==='lbs'?2:1);
+  const W=700,H=160,padL=44,padR=20,padT=16,padB=24;
+  const iW=W-padL-padR, iH=H-padT-padB;
+  const px=i=>padL+(i/(sorted.length-1))*iW;
+  const py=w=>padT+iH-((w-minW)/(maxW-minW))*iH;
+  const pts=sorted.map((e,i)=>`${px(i)},${py(dw[i])}`).join(' ');
+  const area=`${padL},${padT+iH} ${pts} ${px(sorted.length-1)},${padT+iH}`;
+  svgEl.setAttribute('viewBox',`0 0 ${W} ${H}`); svgEl.setAttribute('height',H);
+  svgEl.innerHTML=`
+    <defs><linearGradient id="wg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3fb950" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#3fb950" stop-opacity="0"/>
+    </linearGradient></defs>
+    ${[0,.25,.5,.75,1].map(t=>{const y=padT+t*iH,v=(maxW-(maxW-minW)*t).toFixed(1);return`<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="#30363d" stroke-width="1"/><text x="${padL-6}" y="${y+4}" text-anchor="end" fill="#8b949e" font-size="10" font-family="DM Mono,monospace">${v}</text>`;}).join('')}
+    <polygon points="${area}" fill="url(#wg)"/>
+    <polyline points="${pts}" fill="none" stroke="#3fb950" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+    ${sorted.map((e,i)=>`<circle cx="${px(i)}" cy="${py(dw[i])}" r="5" fill="#1c2330" stroke="#3fb950" stroke-width="2.5"/>`).join('')}
+    ${sorted.map((e,i)=>(i===0||i===sorted.length-1||sorted.length<=6)?`<text x="${px(i)}" y="${H-4}" text-anchor="middle" fill="#8b949e" font-size="9" font-family="DM Mono,monospace">${fmtDateShort(e.date)}</text>`:'').join('')}`;
+}
+
+function shareChart() {
+  const s=[...entries].sort((a,b)=>new Date(a.date)-new Date(b.date));
+  if(s.length<2){showToast('Add at least 2 entries first.');return;}
+  const u=unit,CW=800,CH=320,c=document.createElement('canvas');
+  c.width=CW;c.height=CH;const ctx=c.getContext('2d');
+  ctx.fillStyle='#1c2330';ctx.fillRect(0,0,CW,CH);
+  ctx.fillStyle='#3fb950';ctx.fillRect(0,0,CW,3);
+  ctx.fillStyle='#8b949e';ctx.font='600 12px monospace';ctx.fillText('WEGOVY WEIGHT TREND',28,30);
+  const fE=s[0],lE=s[s.length-1],loss=toDisplay(Math.abs(fE.weight-lE.weight),u);
+  ctx.fillStyle='#3fb950';ctx.font='bold 26px sans-serif';ctx.fillText(`\u2212${loss} ${u} lost`,28,62);
+  ctx.fillStyle='#8b949e';ctx.font='13px sans-serif';
+  const wn=weekNum();ctx.fillText(`${toDisplay(fE.weight,u)} ${u}  \u2192  ${toDisplay(lE.weight,u)} ${u}   |   ${s.length} entries${wn?'   |   Week '+wn:''}`,28,82);
+  const dWs=s.map(e=>toDisplay(e.weight,u));
+  const pL=52,pR=28,pT=104,pB=44,iW=CW-pL-pR,iH=CH-pT-pB;
+  const minW=Math.min(...dWs)-(u==='lbs'?2:1),maxW=Math.max(...dWs)+(u==='lbs'?2:1);
+  const px=i=>pL+(i/(s.length-1))*iW,py=w=>pT+iH-((w-minW)/(maxW-minW))*iH;
+  [0,.25,.5,.75,1].forEach(t=>{const y=pT+t*iH,v=(maxW-(maxW-minW)*t).toFixed(1);ctx.strokeStyle='#30363d';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(pL,y);ctx.lineTo(CW-pR,y);ctx.stroke();ctx.fillStyle='#8b949e';ctx.font='11px monospace';ctx.textAlign='right';ctx.fillText(v,pL-8,y+4);ctx.textAlign='left';});
+  ctx.beginPath();ctx.moveTo(px(0),pT+iH);dWs.forEach((w,i)=>ctx.lineTo(px(i),py(w)));ctx.lineTo(px(s.length-1),pT+iH);ctx.closePath();
+  const g=ctx.createLinearGradient(0,pT,0,pT+iH);g.addColorStop(0,'rgba(63,185,80,.28)');g.addColorStop(1,'rgba(63,185,80,0)');ctx.fillStyle=g;ctx.fill();
+  ctx.beginPath();dWs.forEach((w,i)=>i===0?ctx.moveTo(px(i),py(w)):ctx.lineTo(px(i),py(w)));ctx.strokeStyle='#3fb950';ctx.lineWidth=2.5;ctx.lineJoin='round';ctx.lineCap='round';ctx.stroke();
+  dWs.forEach((w,i)=>{ctx.beginPath();ctx.arc(px(i),py(w),5,0,Math.PI*2);ctx.fillStyle='#1c2330';ctx.fill();ctx.strokeStyle='#3fb950';ctx.lineWidth=2.5;ctx.stroke();});
+  ctx.fillStyle='#8b949e';ctx.font='10px monospace';ctx.textAlign='center';
+  s.forEach((e,i)=>{if(i===0||i===s.length-1||s.length<=6)ctx.fillText(fmtDateShort(e.date),px(i),CH-14);});
+  ctx.textAlign='right';ctx.fillStyle='#30363d';ctx.font='11px monospace';ctx.fillText('Wegovy Tracker',CW-20,CH-14);
+  c.toBlob(blob=>{
+    if(!blob){showToast('Could not export.','error');return;}
+    if(navigator.share&&navigator.canShare&&navigator.canShare({files:[new File([blob],'wegovy.png',{type:'image/png'})]})){
+      navigator.share({files:[new File([blob],'wegovy.png',{type:'image/png'})],title:'My Wegovy Progress'}).catch(()=>{});
+    } else {
+      const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='wegovy-progress.png';a.click();
+      showToast('📥 Image downloaded!');
+    }
+  },'image/png');
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function render() {
+  const u=unit;
+  const sorted=[...entries].sort((a,b)=>new Date(a.date)-new Date(b.date));
+  const first=sorted[0],last=sorted[sorted.length-1];
+  const lossKg=first&&last?first.weight-last.weight:null;
+  const lossDisp=lossKg!==null?toDisplay(Math.abs(lossKg),u):null;
+  const current=[...entries].sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
+  const wn=weekNum();
+  const syncLabels={disconnected:'Not connected',syncing:'Syncing…',connected:'Synced to Google Drive',error:'Sync error'};
+  const syncDotClass='sync-dot'+(syncStatus!=='disconnected'?' '+syncStatus:'');
+
+  document.getElementById('app').innerHTML=`
+    <div class="header">
+      <div class="header-top">
+        <div>
+          <div class="header-pill"><span class="dot"></span> Wegovy Journey</div>
+          <h1>Weight <span>Tracker</span></h1>
+          <p class="subtitle">${wn?`Monitoring your progress — week ${wn} and counting`:'Set your Wegovy start date to track your week'}</p>
+        </div>
+        <div class="header-right">
+          <div class="unit-toggle">
+            <button class="unit-btn${u==='kg'?' active':''}" onclick="setUnit('kg')">KG</button>
+            <button class="unit-btn${u==='lbs'?' active':''}" onclick="setUnit('lbs')">LBS</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Google Drive sync bar -->
+      <div class="sync-bar">
+        <div class="sync-status">
+          <span class="${syncDotClass}" id="syncDot"></span>
+          <span id="syncText">${syncLabels[syncStatus]||syncStatus}</span>
+        </div>
+        <button class="btn-gdrive${accessToken?' connected':''}" id="syncBtn"
+          onclick="${accessToken?'signOut()':'signInWithGoogle()'}">
+          ${accessToken
+            ? '✕ Sign out'
+            : `<svg width="14" height="14" viewBox="0 0 24 24"><path fill="#4285f4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34a853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#fbbc05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#ea4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg> Connect Google Drive`}
+        </button>
+      </div>
+
+      <div class="start-date-row">
+        <span class="start-date-label">Wegovy started:</span>
+        ${editingStart?`
+          <input type="date" class="start-date-input" id="startInput" value="${tempStart}"/>
+          <button class="btn-small" onclick="saveStartDate()">Save</button>
+        `:`
+          <span style="font-family:'DM Mono',monospace;font-size:13px;color:#c9d1d9">
+            ${startDate?new Date(startDate+'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):'—'}
+          </span>
+          <button class="btn-link" onclick="editStart()">edit</button>
+        `}
+      </div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card green">
+        <div class="stat-label">Total Lost</div>
+        <div class="stat-value">${lossDisp!==null?(lossKg>0?'−':'+')+lossDisp:'—'}</div>
+        <div class="stat-sub">${u} since start</div>
+      </div>
+      <div class="stat-card teal">
+        <div class="stat-label">Current Weight</div>
+        <div class="stat-value">${current?toDisplay(current.weight,u):'—'}</div>
+        <div class="stat-sub">${u}</div>
+      </div>
+      <div class="stat-card gold">
+        <div class="stat-label">Week</div>
+        <div class="stat-value">${wn??'—'}</div>
+        <div class="stat-sub">on Wegovy</div>
+      </div>
+    </div>
+
+    <div class="chart-wrap">
+      <div class="chart-header">
+        <div class="chart-title">Weight Trend (${u})</div>
+        ${entries.length>=2?`<button class="btn-share" onclick="shareChart()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.118 1.528 5.852L0 24l6.305-1.654A11.954 11.954 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 01-5.007-1.373l-.36-.214-3.732.979.995-3.638-.235-.374A9.818 9.818 0 012.182 12C2.182 6.58 6.58 2.182 12 2.182c5.42 0 9.818 4.398 9.818 9.818 0 5.42-4.398 9.818-9.818 9.818z"/></svg>
+          Share via WhatsApp
+        </button>`:''}
+      </div>
+      ${entries.length>=2?`<svg class="chart" id="chartSvg"></svg>`:`<div class="chart-empty">Add at least 2 entries to see your chart</div>`}
+    </div>
+
+    <div class="tabs">
+      <button class="tab${activeTab==='log'?' active':''}" onclick="setTab('log')">Log Entry</button>
+      <button class="tab${activeTab==='history'?' active':''}" onclick="setTab('history')">History</button>
+    </div>
+
+    ${activeTab==='log'?renderLog():renderHistory()}
+  `;
+
+  if (entries.length>=2) drawChart(document.getElementById('chartSvg'),entries,u);
+}
+
+function renderLog() {
+  return `<div class="form-card" id="formCard">
+    <div class="section-title">New Check-in</div>
+    <div class="form-grid">
+      <div class="field"><label>Date</label><input type="date" value="${form.date}" onchange="form.date=this.value"/></div>
+      <div class="field"><label>Weight (${unit})</label><input type="number" step="0.1" placeholder="${unit==='lbs'?'e.g. 203.5':'e.g. 92.4'}" value="${form.weight}" oninput="form.weight=this.value"/></div>
+    </div>
+    <div class="field" style="margin-bottom:16px"><label>Wegovy Dose</label>
+      <div class="chips">${DOSES.map(d=>`<span class="chip${form.dose===d?' teal-active':''}" onclick="toggleDose('${d}')">${d}</span>`).join('')}</div>
+    </div>
+    <div class="field" style="margin-bottom:16px"><label>How are you feeling?</label>
+      <div class="chips">${FEELINGS.map(f=>`<span class="chip${form.feeling===f?' active':''}" onclick="toggleFeeling('${f.replace(/'/g,"&#39;")}')">${f}</span>`).join('')}</div>
+    </div>
+    <div class="field" style="margin-bottom:16px"><label>Activity today</label>
+      <div class="chips">${ACTIVITIES.map(a=>`<span class="chip${form.activities.includes(a)?' active':''}" onclick="toggleActivity('${a.replace(/'/g,"&#39;")}')">${a}</span>`).join('')}</div>
+    </div>
+    <div class="field" style="margin-bottom:20px"><label>Notes</label>
+      <textarea rows="2" placeholder="Side effects, appetite, energy, wins..." oninput="form.notes=this.value">${form.notes}</textarea>
+    </div>
+    <button class="btn-primary" onclick="addEntry()" ${!form.weight||!form.date?'disabled':''}>Save Entry</button>
+  </div>`;
+}
+
+function renderHistory() {
+  const u=unit,byDate=[...entries].sort((a,b)=>new Date(b.date)-new Date(a.date));
+  return `
+    <div class="transfer-bar" style="background:#1c2330;border:1px solid #30363d;border-radius:14px;padding:20px 24px;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+      <div><div style="font-family:'DM Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#8b949e;margin-bottom:4px">Manual backup</div>
+        <div style="font-size:13px;color:#c9d1d9">Export or import a backup code</div></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn-export" style="display:inline-flex;align-items:center;gap:7px;background:#1a3a22;border:1px solid rgba(63,185,80,.4);color:#3fb950;border-radius:8px;padding:9px 18px;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;cursor:pointer" onclick="doExport()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export
+        </button>
+        <button style="display:inline-flex;align-items:center;gap:7px;background:#161b22;border:1px solid #30363d;color:#c9d1d9;border-radius:8px;padding:9px 18px;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;cursor:pointer" onclick="openImport()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Import
+        </button>
+      </div>
+    </div>
+    <div class="section-title">All Entries</div>
+    ${entries.length===0
+      ?`<div class="empty-state"><div class="empty-icon">📋</div>No entries yet — log your first check-in!</div>`
+      :byDate.map((e,idx)=>{
+        const prev=byDate[idx+1];
+        const diffKg=prev?e.weight-prev.weight:null;
+        const diffDisp=diffKg!==null?toDisplay(Math.abs(diffKg),u):null;
+        return `<div class="log-entry">
+          <div>
+            <div class="log-date">${fmtDate(e.date)}</div>
+            ${diffKg!==null?`<div style="margin-top:4px;font-size:11px;font-family:'DM Mono',monospace" class="${diffKg<0?'trend-down':diffKg>0?'trend-up':''}">
+              ${diffKg<0?'▼':diffKg>0?'▲':'–'} ${diffDisp} ${u}</div>`:''}
+          </div>
+          <div>
+            <div><span class="log-weight">${toDisplay(e.weight,u)}</span><span class="log-unit"> ${u}</span></div>
+            <div class="log-meta">
+              ${e.dose?`<span class="badge badge-dose">${e.dose}</span>`:''}
+              ${(e.activities||[]).map(a=>`<span class="badge badge-activity">${a}</span>`).join('')}
+              ${e.feeling?`<span class="badge badge-feel">${e.feeling}</span>`:''}
+            </div>
+            ${e.notes?`<div class="log-notes">"${e.notes}"</div>`:''}
+          </div>
+          <button class="delete-btn" onclick="deleteEntry(${e.id})">✕</button>
+        </div>`;
+      }).join('')}`;
+}
+
+// ── Actions ───────────────────────────────────────────────────────────────────
+function setTab(t)  { activeTab=t; render(); }
+function setUnit(u) { unit=u; localStorage.setItem(LS.UNIT,u); form.weight=''; render(); scheduleDriveSave(); }
+function editStart(){ tempStart=startDate; editingStart=true; render(); setTimeout(()=>{const el=document.getElementById('startInput');if(el)el.focus();},50); }
+function saveStartDate() {
+  const val=document.getElementById('startInput')?.value;
+  if(!val)return;
+  startDate=val; localStorage.setItem(LS.START,startDate); editingStart=false; tempStart=val;
+  render(); scheduleDriveSave();
+}
+function toggleDose(d)     { form.dose=form.dose===d?'':d; render(); }
+function toggleFeeling(f)  { form.feeling=form.feeling===f?'':f; render(); }
+function toggleActivity(a) { form.activities=form.activities.includes(a)?form.activities.filter(x=>x!==a):[...form.activities,a]; render(); }
+
+function addEntry() {
+  if(!form.weight||!form.date)return;
+  const entry={...form,weight:toKg(parseFloat(form.weight),unit),id:Date.now()};
+  entries=[entry,...entries];
+  saveAll();
+  form={date:today(),weight:'',dose:'',feeling:'',activities:[],notes:''};
+  render();
+  const card=document.getElementById('formCard');
+  if(card){card.classList.add('flash');setTimeout(()=>card.classList.remove('flash'),600);}
+  showToast('✅ Entry saved!');
+}
+
+function deleteEntry(id) {
+  if(!confirm('Delete this entry?'))return;
+  entries=entries.filter(e=>e.id!==id);
+  saveAll(); render();
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+render();
+initGoogleAuth();
+</script>
+</body>
+</html>
