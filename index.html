@@ -46,6 +46,13 @@ h1 span{color:#3fb950}
 .fitbit-stat-label{font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#8b949e;margin-bottom:3px}
 .fitbit-stat-value{font-size:18px;font-weight:800;color:#00b0b9;letter-spacing:-.02em}
 .fitbit-stat-sub{font-size:11px;color:#8b949e}
+.activity-summary{background:#161b22;border:1px solid #30363d;border-left:3px solid #00b0b9;border-radius:10px;padding:12px 16px;margin:6px 0 10px 0;display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.activity-summary-label{font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#8b949e;width:100%;margin-bottom:2px}
+.activity-summary-stat{display:flex;align-items:center;gap:6px;font-size:13px;color:#c9d1d9}
+.activity-summary-val{font-weight:700;color:#00b0b9}
+.btn-sync-history{display:inline-flex;align-items:center;gap:7px;background:#001f21;border:1px solid rgba(0,176,185,.4);color:#00b0b9;border-radius:8px;padding:9px 18px;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:opacity .15s}
+.btn-sync-history:hover{opacity:.8}
+.btn-sync-history:disabled{opacity:.4;cursor:not-allowed}
 .start-date-row{display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap}
 .start-date-label{font-family:'DM Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#8b949e}
 .start-date-input{background:#161b22;border:1px solid #30363d;border-radius:7px;color:#e6edf3;font-family:'Syne',sans-serif;font-size:13px;padding:6px 10px;outline:none;transition:border-color .2s}
@@ -181,9 +188,11 @@ let saveTimer   = null;
 const FB_CLIENT_ID  = '23V9VS';
 const FB_REDIRECT   = 'https://xhienider.github.io/Wegovy-Tracker/';
 const FB_SCOPES     = 'activity heartrate settings profile';
-const FB_LS         = { TOKEN:'wg-fb-token', VERIFIER:'wg-fb-verifier', STATS:'wg-fb-stats' };
+const FB_LS         = { TOKEN:'wg-fb-token', VERIFIER:'wg-fb-verifier', STATS:'wg-fb-stats', HISTORY:'wg-fb-history' };
 let fbToken         = null;
 let fbStats         = lsGet(FB_LS.STATS) || null; // { steps, calories, activeMinutes, heartRate, date }
+let fbHistory       = lsGet(FB_LS.HISTORY) || {}; // { 'YYYY-MM-DD': { steps, calories, activeMinutes } }
+let fbHistorySyncing = false;
 
 // Restore Fitbit token if still valid
 (function(){
@@ -465,6 +474,79 @@ function updateFitbitBar() {
   }
 }
 
+// ── Fitbit History Sync ───────────────────────────────────────────────────────
+async function fetchFitbitHistory() {
+  if (!fbToken || !startDate) {
+    showToast('Connect Fitbit and set your Wegovy start date first.','error');
+    return;
+  }
+  fbHistorySyncing = true;
+  render();
+
+  try {
+    const start = startDate;
+    const end   = today();
+
+    // Fitbit allows fetching up to 1095 days of time-series data in one call
+    const [stepsResp, calResp, activeResp] = await Promise.all([
+      fetch(`https://api.fitbit.com/1/user/-/activities/steps/date/${start}/${end}.json`,
+        {headers:{Authorization:'Bearer '+fbToken}}),
+      fetch(`https://api.fitbit.com/1/user/-/activities/calories/date/${start}/${end}.json`,
+        {headers:{Authorization:'Bearer '+fbToken}}),
+      fetch(`https://api.fitbit.com/1/user/-/activities/minutesVeryActive/date/${start}/${end}.json`,
+        {headers:{Authorization:'Bearer '+fbToken}})
+    ]);
+
+    if (stepsResp.status===401) {
+      fbToken=null; lsDel(FB_LS.TOKEN); fbHistorySyncing=false;
+      showToast('Fitbit session expired. Please reconnect.','error'); render(); return;
+    }
+
+    const stepsData  = await stepsResp.json();
+    const calData    = await calResp.json();
+    const activeData = await activeResp.json();
+
+    // Build a map keyed by date
+    const history = {};
+    (stepsData['activities-steps']||[]).forEach(d=>{ history[d.dateTime]={ steps:parseInt(d.value)||0, calories:0, activeMinutes:0 }; });
+    (calData['activities-calories']||[]).forEach(d=>{ if(history[d.dateTime]) history[d.dateTime].calories=parseInt(d.value)||0; });
+    (activeData['activities-minutesVeryActive']||[]).forEach(d=>{ if(history[d.dateTime]) history[d.dateTime].activeMinutes=parseInt(d.value)||0; });
+
+    fbHistory = history;
+    lsSet(FB_LS.HISTORY, fbHistory);
+    fbHistorySyncing = false;
+    render();
+
+    const days = Object.keys(history).length;
+    showToast(`✅ Synced ${days} days of Fitbit history!`);
+  } catch(e) {
+    fbHistorySyncing = false;
+    render();
+    showToast('History sync failed: '+e.message,'error');
+  }
+}
+
+// Returns avg stats for a date range (startDate inclusive, endDate exclusive)
+function fitbitPeriodSummary(fromDate, toDate) {
+  const days = [];
+  let cur = new Date(fromDate+'T00:00:00');
+  const end = new Date(toDate+'T00:00:00');
+  while (cur < end) {
+    const key = cur.toISOString().slice(0,10);
+    if (fbHistory[key]) days.push(fbHistory[key]);
+    cur.setDate(cur.getDate()+1);
+  }
+  if (!days.length) return null;
+  const avg = (arr, k) => Math.round(arr.reduce((s,d)=>s+(d[k]||0),0)/arr.length);
+  return {
+    days: days.length,
+    avgSteps:   avg(days,'steps'),
+    avgCals:    avg(days,'calories'),
+    avgActive:  avg(days,'activeMinutes'),
+    totalSteps: days.reduce((s,d)=>s+(d.steps||0),0)
+  };
+}
+
 // ── Import / Export ───────────────────────────────────────────────────────────
 function openImport()  { document.getElementById('importText').value=''; document.getElementById('importModal').classList.add('show'); }
 function closeImport() { document.getElementById('importModal').classList.remove('show'); }
@@ -697,6 +779,22 @@ function renderLog(){
 
 function renderHistory(){
   const u=unit,bd=[...entries].sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const hasFbHistory = Object.keys(fbHistory).length > 0;
+
+  // Helper: render activity summary between two dates
+  function actSummary(fromDate, toDate) {
+    if (!hasFbHistory) return '';
+    const p = fitbitPeriodSummary(fromDate, toDate);
+    if (!p) return '';
+    const days = p.days;
+    return `<div class="activity-summary">
+      <div class="activity-summary-label">📊 Fitbit activity — ${days} day${days!==1?'s':''} (${fmtShort(fromDate)} → ${fmtShort(toDate)})</div>
+      <div class="activity-summary-stat">🚶 Avg steps: <span class="activity-summary-val">${p.avgSteps.toLocaleString()}</span></div>
+      <div class="activity-summary-stat">🔥 Avg calories: <span class="activity-summary-val">${p.avgCals.toLocaleString()}</span></div>
+      <div class="activity-summary-stat">⚡ Avg active mins: <span class="activity-summary-val">${p.avgActive}</span></div>
+    </div>`;
+  }
+
   return `
     <div class="transfer-bar">
       <div><div class="transfer-label">Manual backup</div><div class="transfer-desc">Export or import a backup code</div></div>
@@ -707,10 +805,26 @@ function renderHistory(){
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Import</button>
       </div>
     </div>
+    ${fbToken ? `
+    <div class="transfer-bar" style="margin-bottom:24px">
+      <div>
+        <div class="transfer-label">Fitbit History</div>
+        <div class="transfer-desc">${hasFbHistory ? `${Object.keys(fbHistory).length} days synced since ${fmtShort(startDate||today())}` : 'Sync activity history since your Wegovy start date'}</div>
+      </div>
+      <button class="btn-sync-history" onclick="fetchFitbitHistory()" ${fbHistorySyncing?'disabled':''}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        ${fbHistorySyncing ? 'Syncing…' : hasFbHistory ? 'Re-sync history' : 'Sync history'}
+      </button>
+    </div>` : ''}
     <div class="section-title">All Entries</div>
     ${entries.length===0?`<div class="empty-state"><div class="empty-icon">📋</div>No entries yet!</div>`
     :bd.map((e,i)=>{
       const prev=bd[i+1],dk=prev?e.weight-prev.weight:null,dd=dk!==null?toDisplay(Math.abs(dk),u):null;
+      // Activity summary: from this entry's date up to the next (newer) entry's date
+      // bd is sorted newest-first, so bd[i] is newer, bd[i-1] would be even newer
+      // Period: from e.date (older) to bd[i-1].date (newer) — i.e. current entry up to the next one
+      const nextEntry = i > 0 ? bd[i-1] : null;
+      const periodSummary = nextEntry ? actSummary(e.date, nextEntry.date) : actSummary(e.date, today());
       return `<div class="log-entry">
         <div><div class="log-date">${fmtDate(e.date)}</div>
           ${dk!==null?`<div style="margin-top:4px;font-size:11px;font-family:'DM Mono',monospace" class="${dk<0?'trend-down':dk>0?'trend-up':''}">${dk<0?'▼':dk>0?'▲':'–'} ${dd} ${u}</div>`:''}</div>
@@ -721,7 +835,8 @@ function renderHistory(){
             ${e.feeling?`<span class="badge badge-feel">${e.feeling}</span>`:''}
           </div>${e.notes?`<div class="log-notes">"${e.notes}"</div>`:''}</div>
         <button class="delete-btn" onclick="deleteEntry(${e.id})">✕</button>
-      </div>`;
+      </div>
+      ${periodSummary}`;
     }).join('')}`;
 }
 
