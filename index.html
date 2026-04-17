@@ -526,25 +526,30 @@ async function fetchFitbitHistory() {
   }
 }
 
-// Returns avg stats for a date range (startDate inclusive, endDate exclusive)
-function fitbitPeriodSummary(fromDate, toDate) {
-  const days = [];
+// Returns array of calendar weeks between fromDate (inclusive) and toDate (exclusive)
+// Each week: { label, days: [{date, steps, calories, activeMinutes}] }
+function fitbitWeeklyBreakdown(fromDate, toDate) {
+  const weeks = [];
   let cur = new Date(fromDate+'T00:00:00');
   const end = new Date(toDate+'T00:00:00');
+  let week = null;
+
   while (cur < end) {
-    const key = cur.toISOString().slice(0,10);
-    if (fbHistory[key]) days.push(fbHistory[key]);
+    const key  = cur.toISOString().slice(0,10);
+    const dow  = cur.getDay(); // 0=Sun
+    // Start a new week block on Monday (dow===1) or on the very first day
+    if (!week || dow === 1) {
+      if (week) weeks.push(week);
+      // Week label: Mon dd MMM
+      const label = cur.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+      week = { label, startDate: key, days: [] };
+    }
+    const data = fbHistory[key] || null;
+    week.days.push({ date: key, ...(data || { steps:0, calories:0, activeMinutes:0 }), hasData: !!data });
     cur.setDate(cur.getDate()+1);
   }
-  if (!days.length) return null;
-  const avg = (arr, k) => Math.round(arr.reduce((s,d)=>s+(d[k]||0),0)/arr.length);
-  return {
-    days: days.length,
-    avgSteps:   avg(days,'steps'),
-    avgCals:    avg(days,'calories'),
-    avgActive:  avg(days,'activeMinutes'),
-    totalSteps: days.reduce((s,d)=>s+(d.steps||0),0)
-  };
+  if (week && week.days.length) weeks.push(week);
+  return weeks.filter(w => w.days.some(d=>d.hasData));
 }
 
 // ── Import / Export ───────────────────────────────────────────────────────────
@@ -781,18 +786,43 @@ function renderHistory(){
   const u=unit,bd=[...entries].sort((a,b)=>new Date(b.date)-new Date(a.date));
   const hasFbHistory = Object.keys(fbHistory).length > 0;
 
-  // Helper: render activity summary between two dates
-  function actSummary(fromDate, toDate) {
+  // Render weekly activity blocks between two dates
+  function weeklyBlocks(fromDate, toDate) {
     if (!hasFbHistory) return '';
-    const p = fitbitPeriodSummary(fromDate, toDate);
-    if (!p) return '';
-    const days = p.days;
-    return `<div class="activity-summary">
-      <div class="activity-summary-label">📊 Fitbit activity — ${days} day${days!==1?'s':''} (${fmtShort(fromDate)} → ${fmtShort(toDate)})</div>
-      <div class="activity-summary-stat">🚶 Avg steps: <span class="activity-summary-val">${p.avgSteps.toLocaleString()}</span></div>
-      <div class="activity-summary-stat">🔥 Avg calories: <span class="activity-summary-val">${p.avgCals.toLocaleString()}</span></div>
-      <div class="activity-summary-stat">⚡ Avg active mins: <span class="activity-summary-val">${p.avgActive}</span></div>
-    </div>`;
+    const weeks = fitbitWeeklyBreakdown(fromDate, toDate);
+    if (!weeks.length) return '';
+    return weeks.map(w => {
+      const tot = d => w.days.reduce((s,x)=>s+(x[d]||0),0);
+      const daysWithData = w.days.filter(d=>d.hasData);
+      if (!daysWithData.length) return '';
+      // Daily rows
+      const rows = w.days.filter(d=>d.hasData).map(d => {
+        const dow = new Date(d.date+'T00:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
+        return `<div style="display:grid;grid-template-columns:110px 1fr 1fr 1fr;gap:4px;padding:5px 0;border-bottom:1px solid #1e2738;font-size:12px;align-items:center">
+          <span style="font-family:'DM Mono',monospace;font-size:10px;color:#8b949e">${dow}</span>
+          <span style="color:#c9d1d9">🚶 ${d.steps.toLocaleString()}</span>
+          <span style="color:#c9d1d9">🔥 ${d.calories.toLocaleString()}</span>
+          <span style="color:#c9d1d9">⚡ ${d.activeMinutes}m</span>
+        </div>`;
+      }).join('');
+      // Week totals
+      const totSteps = tot('steps'), totCals = tot('calories'), totActive = tot('activeMinutes');
+      const avgSteps = Math.round(totSteps/daysWithData.length);
+      return `<div class="activity-summary">
+        <div style="display:flex;justify-content:space-between;align-items:center;width:100%;margin-bottom:8px">
+          <div class="activity-summary-label" style="margin:0">📅 Week of ${w.label}</div>
+          <div style="font-family:'DM Mono',monospace;font-size:10px;color:#8b949e">${daysWithData.length} day${daysWithData.length!==1?'s':''}</div>
+        </div>
+        ${rows}
+        <div style="display:grid;grid-template-columns:110px 1fr 1fr 1fr;gap:4px;padding:6px 0 0;font-size:12px;align-items:center;margin-top:2px">
+          <span style="font-family:'DM Mono',monospace;font-size:10px;color:#00b0b9;font-weight:700">TOTAL</span>
+          <span class="activity-summary-val">🚶 ${totSteps.toLocaleString()}</span>
+          <span class="activity-summary-val">🔥 ${totCals.toLocaleString()}</span>
+          <span class="activity-summary-val">⚡ ${totActive}m</span>
+        </div>
+        <div style="font-family:'DM Mono',monospace;font-size:10px;color:#8b949e;margin-top:4px">Avg steps/day: ${avgSteps.toLocaleString()}</div>
+      </div>`;
+    }).join('');
   }
 
   return `
@@ -820,11 +850,9 @@ function renderHistory(){
     ${entries.length===0?`<div class="empty-state"><div class="empty-icon">📋</div>No entries yet!</div>`
     :bd.map((e,i)=>{
       const prev=bd[i+1],dk=prev?e.weight-prev.weight:null,dd=dk!==null?toDisplay(Math.abs(dk),u):null;
-      // Activity summary: from this entry's date up to the next (newer) entry's date
-      // bd is sorted newest-first, so bd[i] is newer, bd[i-1] would be even newer
-      // Period: from e.date (older) to bd[i-1].date (newer) — i.e. current entry up to the next one
+      // Show weeks between this entry (older) and the next newer entry above it in the list
       const nextEntry = i > 0 ? bd[i-1] : null;
-      const periodSummary = nextEntry ? actSummary(e.date, nextEntry.date) : actSummary(e.date, today());
+      const actBlocks = nextEntry ? weeklyBlocks(e.date, nextEntry.date) : weeklyBlocks(e.date, today());
       return `<div class="log-entry">
         <div><div class="log-date">${fmtDate(e.date)}</div>
           ${dk!==null?`<div style="margin-top:4px;font-size:11px;font-family:'DM Mono',monospace" class="${dk<0?'trend-down':dk>0?'trend-up':''}">${dk<0?'▼':dk>0?'▲':'–'} ${dd} ${u}</div>`:''}</div>
@@ -836,7 +864,7 @@ function renderHistory(){
           </div>${e.notes?`<div class="log-notes">"${e.notes}"</div>`:''}</div>
         <button class="delete-btn" onclick="deleteEntry(${e.id})">✕</button>
       </div>
-      ${periodSummary}`;
+      ${actBlocks}`;
     }).join('')}`;
 }
 
